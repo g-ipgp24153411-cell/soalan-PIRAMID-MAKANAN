@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Misi Kapal Terbang: Piramid Makanan</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;font-family:Arial,sans-serif;background:#8bd8f7}
+body{overflow:hidden}
+#game{width:100%;height:100%;display:flex;flex-direction:column;background:linear-gradient(#8bd8f7 0 42%,#79c95e 42% 100%)}
+#hud{padding:10px;z-index:5;background:rgba(139,216,247,.95)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;max-width:1100px;margin:auto}
+h1{margin:0;background:#fffbea;color:#e65139;border-radius:14px;padding:9px 16px;font-size:clamp(16px,2.4vw,25px)}
+.stats{display:flex;gap:8px}
+.stat{background:white;border-radius:12px;padding:8px 13px;font-weight:900;white-space:nowrap}
+#question{max-width:950px;margin:9px auto 0;background:#fffdf2;border-radius:16px;padding:10px 14px;text-align:center}
+#qtext{font-weight:900;font-size:clamp(15px,2vw,22px);margin:3px 0 9px}
+#choices{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
+.choice{min-height:48px;border:3px solid var(--c);border-radius:11px;background:white;display:flex;align-items:center;gap:8px;padding:6px 9px;text-align:left;font-weight:800}
+.letter{width:31px;height:31px;display:grid;place-items:center;background:var(--c);border-radius:8px;flex:none}
+#play{position:relative;flex:1;overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;height:100%}
+#feedback{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%) scale(.7);opacity:0;z-index:4;color:white;font-size:clamp(40px,8vw,82px);font-weight:900;text-shadow:0 5px 0 #257e55,0 10px 20px #16404caa;pointer-events:none;transition:.2s}
+#feedback.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#feedback.wrong{text-shadow:0 5px 0 #a63c30,0 10px 20px #16404caa}
+#help{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:3;background:#173750dd;color:#fff;border-radius:30px;padding:7px 13px;font-weight:800;font-size:14px;white-space:nowrap}
+#finish{display:none;position:absolute;inset:0;background:#133a59cc;z-index:10;align-items:center;justify-content:center;padding:20px}
+#finish.show{display:flex}
+.card{background:#fffdf0;border-radius:25px;padding:35px;text-align:center;max-width:480px;width:100%;box-shadow:0 12px 0 #e3b95e}
+.card h2{color:#e6533b;font-size:42px;margin:0 0 12px}
+#final{font-size:28px;font-weight:900;color:#166e83}
+button{border:0;border-radius:14px;background:#ed6046;color:#fff;padding:13px 25px;font-size:19px;font-weight:900;cursor:pointer}
+@media(max-width:650px){
+ #hud{padding:6px}
+ .top{flex-wrap:wrap;justify-content:center}
+ h1{width:100%;text-align:center;font-size:16px;padding:6px}
+ .stat{padding:5px 10px;font-size:13px}
+ #question{margin-top:5px;padding:7px}
+ #choices{grid-template-columns:1fr;gap:4px}
+ .choice{min-height:36px;font-size:13px}
+ .letter{width:26px;height:26px}
+ #help{font-size:11px;bottom:6px}
+}
+</style>
+</head>
+<body>
+<div id="game">
+ <div id="hud">
+  <div class="top">
+   <h1>✈️ MISI PIRAMID MAKANAN</h1>
+   <div class="stats">
+    <div class="stat" id="score">Skor: 0</div>
+    <div class="stat" id="progress">Soalan: 1/5</div>
+   </div>
+  </div>
+  <div id="question">
+   <div style="font-size:11px;font-weight:900;color:#e47630;letter-spacing:.1em">LANGGAR JAWAPAN YANG BETUL</div>
+   <div id="qtext"></div>
+   <div id="choices"></div>
+  </div>
+ </div>
+
+ <div id="play">
+  <canvas id="canvas"></canvas>
+  <div id="feedback"></div>
+  <div id="help">← → Gerakkan kapal terbang • Swipe kiri / kanan</div>
+  <div id="finish">
+   <div class="card">
+    <h2>🎉 TAHNIAH! 🎉</h2>
+    <p>Anda telah menyelesaikan Misi Piramid Makanan!</p>
+    <div id="final">Skor Anda: 0/5</div>
+    <p id="message"></p>
+    <button id="restart">MAIN SEMULA</button>
+   </div>
+  </div>
+ </div>
+</div>
+
+<script>
+const questions=[
+ {q:"Apakah aras pertama atau aras paling bawah dalam Piramid Makanan Malaysia?",a:["Buah-buahan dan sayur-sayuran","Bijirin, bijirin penuh dan ubi-ubian","Ikan, ayam, daging, telur dan kekacang","Lemak, minyak, garam dan gula"],correct:0},
+ {q:"Antara berikut, yang manakah merupakan contoh makanan daripada kumpulan buah-buahan dan sayur-sayuran?",a:["Epal dan lobak merah","Nasi dan mi","Ikan dan ayam","Minyak dan marjerin"],correct:0},
+ {q:"Apakah fungsi utama makanan daripada kumpulan bijirin, bijirin penuh dan ubi-ubian?",a:["Membekalkan tenaga kepada badan","Membekalkan vitamin sahaja","Membekalkan lemak kepada badan","Menambahkan rasa manis kepada makanan"],correct:0},
+ {q:"Antara berikut, yang manakah merupakan contoh makanan daripada kumpulan ikan, ayam, daging, telur dan kekacang?",a:["Nasi, roti dan kentang","Bayam, lobak dan epal","Ikan, telur dan kacang","Minyak masak, mentega dan gula"],correct:2},
+ {q:"Mengapakah kita perlu mengambil makanan daripada pelbagai kumpulan dalam Piramid Makanan Malaysia?",a:["Supaya dapat mengambil satu jenis makanan sahaja","Supaya mendapat pelbagai nutrien yang diperlukan oleh badan","Supaya boleh mengambil makanan manis dengan lebih banyak","Supaya tidak perlu mengambil buah-buahan dan sayur-sayuran"],correct:1}
+];
+const colors=["#ffad4e","#71c9ed","#bba3f5","#8bd882"];
+const canvas=document.getElementById("canvas"),ctx=canvas.getContext("2d");
+const play=document.getElementById("play");
+let W=0,H=0,dpr=1;
+let q=0,score=0,lane=1,targetLane=1,state="playing";
+let answerZ=0;
+let last=performance.now();
+let feedbackTimer;
+
+function resize(){
+ dpr=Math.min(window.devicePixelRatio||1,2);
+ W=play.clientWidth; H=play.clientHeight;
+ canvas.width=Math.floor(W*dpr); canvas.height=Math.floor(H*dpr);
+ canvas.style.width=W+"px"; canvas.style.height=H+"px";
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener("resize",resize);
+new ResizeObserver(resize).observe(play);
+
+function laneX(i){return W*(i+0.5)/4}
+function updateHud(){
+ document.getElementById("score").textContent="Skor: "+score;
+ document.getElementById("progress").textContent="Soalan: "+(q+1)+"/5";
+ document.getElementById("qtext").textContent=questions[q].q;
+ const c=document.getElementById("choices"); c.innerHTML="";
+ questions[q].a.forEach((ans,i)=>{
+  const d=document.createElement("div");
+  d.className="choice"; d.style.setProperty("--c",colors[i]);
+  d.innerHTML='<span class="letter">'+String.fromCharCode(65+i)+'</span><span>— '+ans+'</span>';
+  c.appendChild(d);
+ });
+}
+function resetAnswer(){answerZ=-1.2}
+function showFeedback(ok){
+ const el=document.getElementById("feedback");
+ el.textContent=ok?"BETUL! +1 ⭐":"CUBA LAGI!";
+ el.className=ok?"show":"show wrong";
+ clearTimeout(feedbackTimer);
+ feedbackTimer=setTimeout(()=>el.className="",ok?800:900);
+}
+function finish(){
+ state="finished";
+ document.getElementById("final").textContent="Skor Anda: "+score+"/5";
+ document.getElementById("message").textContent=score===5?"Cemerlang! Anda sangat memahami Piramid Makanan!":score>=4?"Bagus! Teruskan belajar!":"Teruskan berlatih untuk meningkatkan pengetahuan!";
+ document.getElementById("finish").classList.add("show");
+}
+function hit(i){
+ if(state!=="playing")return;
+ const ok=i===questions[q].correct;
+ showFeedback(ok);
+ if(ok){
+  score++; state="transition"; updateHud();
+  setTimeout(()=>{
+   q++;
+   if(q>=questions.length){finish();return}
+   updateHud(); resetAnswer(); state="playing";
+  },850);
+ }else{
+  state="wrong";
+  setTimeout(()=>{if(state==="wrong")state="playing"},650);
+ }
+}
+function move(dir){
+ if(state!=="playing")return;
+ targetLane=Math.max(0,Math.min(3,targetLane+dir));
+}
+document.addEventListener("keydown",e=>{
+ if(e.key==="ArrowLeft"||e.key==="ArrowRight"){
+  e.preventDefault(); move(e.key==="ArrowLeft"?-1:1);
+ }
+});
+let sx=null,sy=null;
+play.addEventListener("touchstart",e=>{
+ sx=e.changedTouches[0].clientX; sy=e.changedTouches[0].clientY;
+},{passive:true});
+play.addEventListener("touchend",e=>{
+ if(sx===null)return;
+ const dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;
+ if(Math.abs(dx)>25&&Math.abs(dx)>Math.abs(dy))move(dx<0?-1:1);
+ sx=sy=null;
+},{passive:true});
+
+document.getElementById("restart").onclick=()=>{
+ q=0;score=0;lane=1;targetLane=1;state="playing";
+ document.getElementById("finish").classList.remove("show");
+ updateHud();resetAnswer();
+};
+
+function roundRect(x,y,w,h,r,fill,stroke){
+ ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.stroke()}
+}
+function drawBackground(t){
+ const horizon=H*.28;
+ ctx.fillStyle="#8bd8f7";ctx.fillRect(0,0,W,H);
+ ctx.fillStyle="#75c95c";ctx.fillRect(0,horizon,W,H-horizon);
+ // mountains
+ ctx.fillStyle="#58a94f";
+ for(let i=-1;i<8;i++){
+  const x=i*W/4+(t*.015%W/4);
+  ctx.beginPath();ctx.moveTo(x,horizon+30);ctx.lineTo(x+W/8,horizon-70);ctx.lineTo(x+W/4,horizon+30);ctx.fill();
+ }
+ // road
+ const roadTop=horizon+10;
+ ctx.fillStyle="#a5d87b";ctx.fillRect(W*.08,roadTop,W*.84,H-roadTop);
+ // lane lines
+ ctx.strokeStyle="#eef7c8";ctx.lineWidth=3;ctx.setLineDash([20,20]);
+ for(let i=1;i<4;i++){ctx.beginPath();ctx.moveTo(W*i/4,roadTop);ctx.lineTo(W*i/4,H);ctx.stroke()}
+ ctx.setLineDash([]);
+ // side trees
+ for(let i=0;i<12;i++){
+  let z=((i*120+t*.08)%(H+100))-50;
+  let s=.5+z/H*.8;
+  let x=i%2?W*.05:W*.95;
+  ctx.fillStyle="#8b6546";ctx.fillRect(x-3,z,6,25*s);
+  ctx.fillStyle=i%3?"#3f9c58":"#79c95e";ctx.beginPath();ctx.arc(x,z,20*s,0,Math.PI*2);ctx.fill();
+ }
+}
+function drawAnswer(t){
+ const y=H*.27 + answerZ*(H*.72);
+ const boxW=Math.min(150,W*.19),boxH=70;
+ for(let i=0;i<4;i++){
+  const x=laneX(i)-boxW/2;
+  if(y< -boxH||y>H+boxH)continue;
+  roundRect(x,y,boxW,boxH,14,colors[i],"#ffffff");
+  ctx.fillStyle="#173750";ctx.font="900 25px Arial";ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillText(String.fromCharCode(65+i),laneX(i),y+22);
+  ctx.font="800 "+Math.max(11,Math.min(16,W/65))+"px Arial";
+  const words=questions[q].a[i].split(" ");
+  let lines=[],line="";
+  for(const word of words){
+   const test=line?line+" "+word:word;
+   if(ctx.measureText(test).width>boxW-14){lines.push(line);line=word}else line=test;
+  }
+  if(line)lines.push(line);
+  lines.slice(0,2).forEach((ln,k)=>ctx.fillText(ln,laneX(i),y+45+k*15));
+ }
+}
+function drawPlane(t){
+ const x=laneX(lane),y=H*.68+Math.sin(t*.006)*3;
+ ctx.save();ctx.translate(x,y);
+ const tilt=(lane-targetLane)*.03;ctx.rotate(tilt);
+ // shadow
+ ctx.fillStyle="rgba(0,0,0,.16)";ctx.beginPath();ctx.ellipse(0,28,48,9,0,0,Math.PI*2);ctx.fill();
+ // wings
+ ctx.fillStyle="#e94437";ctx.beginPath();ctx.moveTo(-58,8);ctx.lineTo(-8,-4);ctx.lineTo(-4,10);ctx.lineTo(-50,20);ctx.closePath();ctx.fill();
+ ctx.beginPath();ctx.moveTo(58,8);ctx.lineTo(8,-4);ctx.lineTo(4,10);ctx.lineTo(50,20);ctx.closePath();ctx.fill();
+ // body
+ ctx.fillStyle="#f04b3d";ctx.beginPath();ctx.ellipse(0,0,18,47,0,0,Math.PI*2);ctx.fill();
+ // nose
+ ctx.fillStyle="#c72f2b";ctx.beginPath();ctx.moveTo(-14,-38);ctx.lineTo(0,-55);ctx.lineTo(14,-38);ctx.closePath();ctx.fill();
+ // cockpit
+ ctx.fillStyle="#66c5e3";ctx.beginPath();ctx.ellipse(0,-12,10,15,0,0,Math.PI*2);ctx.fill();
+ // tail
+ ctx.fillStyle="#b92c2c";ctx.beginPath();ctx.moveTo(-12,35);ctx.lineTo(0,18);ctx.lineTo(12,35);ctx.closePath();ctx.fill();
+ // propeller
+ ctx.strokeStyle="#425363";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-13,-57);ctx.lineTo(13,-57);ctx.stroke();
+ ctx.restore();
+}
+function animate(now){
+ const dt=Math.min((now-last)/1000,.05);last=now;
+ if(state!=="finished"){
+  lane+=(targetLane-lane)*Math.min(1,dt*12);
+  if(state==="playing"){
+   answerZ+=dt*.9; // jawapan bergerak ke arah kapal
+   if(answerZ>.95){resetAnswer()}
+   // collision when answer row reaches plane
+   const y=H*.27+answerZ*(H*.72), planeY=H*.68;
+   if(Math.abs(y-planeY)<24){
+    for(let i=0;i<4;i++) if(Math.abs(laneX(i)-laneX(lane))<W*.115) hit(i);
+   }
+  }
+ }
+ drawBackground(now);drawAnswer(now);drawPlane(now);
+ requestAnimationFrame(animate);
+}
+updateHud();resize();resetAnswer();requestAnimationFrame(animate);
+</script>
+</body>
+</html>
